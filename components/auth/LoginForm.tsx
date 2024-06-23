@@ -3,6 +3,7 @@
 import {
 	Form,
 	FormControl,
+	FormDescription,
 	FormField,
 	FormItem,
 	FormMessage,
@@ -10,39 +11,92 @@ import {
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
-import { useState, useTransition } from "react";
-import { GoEye, GoEyeClosed } from "react-icons/go";
+import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { ImSpinner2 } from "react-icons/im";
-import { loginFormSchema, loginFormSchemaType } from "@/schemas/auth";
+import {
+	loginFormEmailSchema,
+	loginFormEmailSchemaType,
+	loginFormPinSchema,
+	loginFormPinSchemaType,
+} from "@/schemas/auth";
+import { SetPinResponseData, UserData, UserDataError } from "@/helpers/models";
+import { setPin } from "@/actions/auth";
+import { useToast } from "@/components/ui/use-toast";
 
 export default function LoginForm() {
-	const [isPending, startTransition] = useTransition();
-	const [showPassword, setShowPassword] = useState(false);
+	const { toast } = useToast();
+	const [isLoading, setIsLoading] = useState(false);
+	const [userEmail, setUserEmail] = useState<string | null>(null);
+	const [isShowPinForm, setIsShowPinForm] = useState(false);
 
-	const form = useForm<loginFormSchemaType>({
-		resolver: zodResolver(loginFormSchema),
+	const emailForm = useForm<loginFormEmailSchemaType>({
+		resolver: zodResolver(loginFormEmailSchema),
 		defaultValues: {
 			email: "",
-			password: "",
 		},
 	});
 
-	const onFormSubmit = (values: loginFormSchemaType) => {
+	const pinForm = useForm<loginFormPinSchemaType>({
+		resolver: zodResolver(loginFormPinSchema),
+		defaultValues: {
+			pin: "",
+		},
+	});
+
+	useEffect(() => {
+		const email = localStorage.getItem("userEmail");
+		if (email) {
+			setUserEmail(email);
+			emailForm.setValue("email", email);
+			setIsShowPinForm(true);
+		}
+	}, []);
+
+	const onFormEmailSubmit = async (values: loginFormEmailSchemaType) => {
 		console.log(values);
+
+		const data = new FormData();
+		data.append("email", values.email);
+
+		const setPinResult = await setPin(data);
+
+		if (setPinResult.error) {
+			localStorage.removeItem("userEmail");
+			toast({
+				variant: "destructive",
+				title: "Ошибка",
+				description: "Что-то пошло не так",
+			});
+		}
+
+		if (setPinResult.success) {
+			localStorage.setItem("userEmail", values.email);
+			setIsShowPinForm(true);
+		}
+	};
+
+	const onFormPinSubmit = async (values: loginFormPinSchemaType) => {
+		console.log(values);
+
+		const data = new FormData();
+		if (userEmail) {
+			data.append("email", userEmail);
+		}
+		data.append("pin", values.pin);
 	};
 
 	return (
 		<div className="w-full 2sm:w-[350px] space-y-4">
-			<h1 className="text-2xl font-bold text-center">Регистрация</h1>
-			<div>
-				<Form {...form}>
+			<h1 className="text-2xl font-bold text-center">Войти</h1>
+			<div className="space-y-4">
+				<Form {...emailForm}>
 					<form
-						onSubmit={form.handleSubmit(onFormSubmit)}
+						onSubmit={emailForm.handleSubmit(onFormEmailSubmit)}
 						className="space-y-4"
 					>
 						<FormField
-							control={form.control}
+							control={emailForm.control}
 							name="email"
 							render={({ field }) => (
 								<FormItem>
@@ -50,53 +104,66 @@ export default function LoginForm() {
 										<Input
 											placeholder="Email"
 											{...field}
-											disabled={isPending}
+											disabled={isLoading || !!userEmail}
 										/>
 									</FormControl>
 									<FormMessage />
 								</FormItem>
 							)}
 						/>
-						<FormField
-							control={form.control}
-							name="password"
-							render={({ field }) => (
-								<FormItem>
-									<FormControl>
-										<div className="relative">
-											<Input
-												type={showPassword ? "text" : "password"}
-												placeholder="Пароль"
-												disabled={isPending}
-												{...field}
-											/>
-											<Button
-												variant={"ghost"}
-												size="sm"
-												className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-												onClick={(e) => {
-													e.preventDefault();
-													setShowPassword((prev) => !prev);
-												}}
-											>
-												{showPassword ? <GoEye /> : <GoEyeClosed />}
-											</Button>
-										</div>
-									</FormControl>
-									<FormMessage />
-								</FormItem>
-							)}
-						/>
-						<Button
-							onClick={form.handleSubmit(onFormSubmit)}
-							disabled={form.formState.isSubmitting}
-							className="w-full mt-4"
-						>
-							{!isPending && <span>Войти</span>}
-							{isPending && <ImSpinner2 className="animate-spin" />}
-						</Button>
 					</form>
 				</Form>
+				{isShowPinForm && (
+					<Form {...pinForm}>
+						<form
+							onSubmit={pinForm.handleSubmit(onFormPinSubmit)}
+							className="space-y-4"
+						>
+							<FormField
+								control={pinForm.control}
+								name="pin"
+								render={({ field }) => (
+									<FormItem>
+										<FormControl>
+											<Input
+												placeholder="PIN"
+												{...field}
+												disabled={isLoading}
+											/>
+										</FormControl>
+										<FormDescription>
+											На указанную почту, было отправлено письмо с PIN для
+											авторизации
+										</FormDescription>
+										<FormMessage />
+									</FormItem>
+								)}
+							/>
+						</form>
+					</Form>
+				)}
+
+				{!isShowPinForm && (
+					<Button
+						onClick={emailForm.handleSubmit(onFormEmailSubmit)}
+						disabled={emailForm.formState.isSubmitting}
+						className="w-full mt-4"
+					>
+						{!isLoading && <span>Войти</span>}
+						{isLoading && <ImSpinner2 className="animate-spin" />}
+					</Button>
+				)}
+
+				{isShowPinForm && (
+					<Button
+						onClick={pinForm.handleSubmit(onFormPinSubmit)}
+						disabled={pinForm.formState.isSubmitting}
+						className="w-full mt-4"
+					>
+						{!isLoading && <span>Войти</span>}
+						{isLoading && <ImSpinner2 className="animate-spin" />}
+					</Button>
+				)}
 			</div>
 		</div>
 	);

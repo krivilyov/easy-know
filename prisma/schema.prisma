@@ -12,3 +12,32 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+enum Role {
+  CUSTOMER
+  ADMIN
+}
+
+
+model Users {
+  id  String  @id @default(cuid())
+  email String   @unique
+  password  String?
+  hashPin String?
+  role  Role  @default(CUSTOMER)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  company Companies? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  companyId String?
+  banned Boolean @default(false)
+}
+
+model Companies {
+  id  String  @id @default(cuid())
+  slug String?
+  name String @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  users Users[]
+  banned Boolean @default(false)
+}

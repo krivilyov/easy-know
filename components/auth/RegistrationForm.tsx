@@ -14,63 +14,47 @@ import {
 	registrationFormSchemaType,
 } from "@/schemas/auth";
 import { Button } from "@/components/ui/button";
-import { useState, useTransition } from "react";
-import { GoEye, GoEyeClosed } from "react-icons/go";
 import { Input } from "@/components/ui/input";
 import { ImSpinner2 } from "react-icons/im";
 import { registration } from "@/actions/auth";
+import { UserData, UserDataError } from "@/helpers/models";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 export default function RegistrationForm() {
-	const [isPending, startTransition] = useTransition();
-	const [showPassword, setShowPassword] = useState(false);
+	const router = useRouter();
+	const [isLoading, setIsLoading] = useState(false);
 
 	const form = useForm<registrationFormSchemaType>({
 		resolver: zodResolver(registrationFormSchema),
 		defaultValues: {
 			email: "",
-			password: "",
-			confirmPassword: "",
 		},
 	});
 
 	const onFormSubmit = async (values: registrationFormSchemaType) => {
-		console.log(values);
+		setIsLoading(true);
 		const data = new FormData();
 		data.append("email", values.email);
-		data.append("password", values.password);
-		data.append("confirmPassword", values.confirmPassword);
 
-		const user = await registration(data);
-
+		const user: UserData | UserDataError = await registration(data);
+		setIsLoading(false);
 		//если вернулись ошибки
-		if (user?.error) {
+		if (user.error) {
 			if (user.error.email && user.error.email.length > 0) {
 				let errors = "";
-				user.error.email.forEach((error) => {
+				user.error.email.forEach((error: string) => {
 					errors += error + ". ";
 				});
 
 				form.setError("email", { type: "server", message: errors });
 			}
-			if (user.error.password && user.error.password.length > 0) {
-				let errors = "";
-				user.error.password.forEach((error) => {
-					errors += error + ". ";
-				});
-
-				form.setError("password", { type: "server", message: errors });
-			}
-			if (user.error.confirmPassword && user.error.confirmPassword.length > 0) {
-				let errors = "";
-				user.error.confirmPassword.forEach((error) => {
-					errors += error + ". ";
-				});
-
-				form.setError("confirmPassword", { type: "server", message: errors });
-			}
 		}
 
-		console.log("user", user);
+		if ((user as UserData).id) {
+			localStorage.setItem("userEmail", (user as UserData).email);
+			router.push("/login");
+		}
 	};
 
 	return (
@@ -91,67 +75,8 @@ export default function RegistrationForm() {
 										<Input
 											placeholder="Email"
 											{...field}
-											disabled={isPending}
+											disabled={isLoading}
 										/>
-									</FormControl>
-									<FormMessage />
-								</FormItem>
-							)}
-						/>
-						<FormField
-							control={form.control}
-							name="password"
-							render={({ field }) => (
-								<FormItem>
-									<FormControl>
-										<div className="relative">
-											<Input
-												type={showPassword ? "text" : "password"}
-												placeholder="Пароль"
-												disabled={isPending}
-												{...field}
-											/>
-											<Button
-												variant={"ghost"}
-												size="sm"
-												className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-												onClick={(e) => {
-													e.preventDefault();
-													setShowPassword((prev) => !prev);
-												}}
-											>
-												{showPassword ? <GoEye /> : <GoEyeClosed />}
-											</Button>
-										</div>
-									</FormControl>
-									<FormMessage />
-								</FormItem>
-							)}
-						/>
-						<FormField
-							control={form.control}
-							name="confirmPassword"
-							render={({ field }) => (
-								<FormItem>
-									<FormControl>
-										<div className="relative">
-											<Input
-												type={showPassword ? "text" : "password"}
-												placeholder="Подтвердите пароль"
-												{...field}
-											/>
-											<Button
-												variant={"ghost"}
-												size="sm"
-												className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-												onClick={(e) => {
-													e.preventDefault();
-													setShowPassword((prev) => !prev);
-												}}
-											>
-												{showPassword ? <GoEye /> : <GoEyeClosed />}
-											</Button>
-										</div>
 									</FormControl>
 									<FormMessage />
 								</FormItem>
@@ -162,8 +87,8 @@ export default function RegistrationForm() {
 							disabled={form.formState.isSubmitting}
 							className="w-full mt-4"
 						>
-							{!isPending && <span>Зарегистрироваться</span>}
-							{isPending && <ImSpinner2 className="animate-spin" />}
+							{!isLoading && <span>Зарегистрироваться</span>}
+							{isLoading && <ImSpinner2 className="animate-spin" />}
 						</Button>
 					</form>
 				</Form>
