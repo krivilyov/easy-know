@@ -6,7 +6,6 @@ import prisma from "@/lib/prisma";
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
-import { Resend } from "resend";
 
 const secretKey = process.env.JWT_SECRET_KEY;
 const key = new TextEncoder().encode(secretKey);
@@ -119,28 +118,6 @@ export async function setPin(formData: FormData) {
 
 	if (updatedUser) {
 		console.log("updatedUser", updatedUser);
-		const resend = new Resend(process.env.RESEND_API_KEY);
-		console.log("RESEND_API_KEY", process.env.RESEND_API_KEY);
-		const { data, error } = await resend.emails.send({
-			from: "Krivilyov Ivan <contact@eimaam.dev>",
-			to: user.email,
-			subject: "PIN для входа в приложение",
-			html: `<div>Ваш PIN для входа в приложение: <span style="font-waight:bold">${randPin}</span></div>`,
-		});
-
-		console.log("data", data, "error", error);
-
-		if (error) {
-			return {
-				error: true,
-				success: false,
-			};
-		}
-
-		return {
-			error: null,
-			success: true,
-		};
 	}
 
 	throw new Error("something went wrong");
