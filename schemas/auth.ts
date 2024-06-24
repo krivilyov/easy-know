@@ -23,3 +23,13 @@ export const loginFormPinSchema = z.object({
 });
 
 export type loginFormPinSchemaType = z.infer<typeof loginFormPinSchema>;
+
+export const loginFormSchema = z.object({
+	email: z
+		.string()
+		.min(1, { message: "Поле не может быть пустым" })
+		.email({ message: "Вы ввели некорректный email" }),
+	pin: z.string().min(1, { message: "Поле не может быть пустым" }),
+});
+
+export type loginFormSchemaType = z.infer<typeof loginFormSchema>;

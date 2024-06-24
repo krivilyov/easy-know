@@ -20,12 +20,13 @@ import {
 	loginFormPinSchema,
 	loginFormPinSchemaType,
 } from "@/schemas/auth";
-import { SetPinResponseData, UserData, UserDataError } from "@/helpers/models";
-import { setPin } from "@/actions/auth";
+import { login, setPin } from "@/actions/auth";
 import { useToast } from "@/components/ui/use-toast";
+import { useRouter } from "next/navigation";
 
 export default function LoginForm() {
 	const { toast } = useToast();
+	const router = useRouter();
 	const [isLoading, setIsLoading] = useState(false);
 	const [userEmail, setUserEmail] = useState<string | null>(null);
 	const [isShowPinForm, setIsShowPinForm] = useState(false);
@@ -54,15 +55,23 @@ export default function LoginForm() {
 	}, []);
 
 	const onFormEmailSubmit = async (values: loginFormEmailSchemaType) => {
-		console.log(values);
-
 		const data = new FormData();
 		data.append("email", values.email);
 
 		const setPinResult = await setPin(data);
 
 		if (setPinResult.error) {
-			localStorage.removeItem("userEmail");
+			if (setPinResult.error.email && setPinResult.error.email.length > 0) {
+				let errors = "";
+				setPinResult.error.email.forEach((error: string) => {
+					errors += error + ". ";
+				});
+
+				emailForm.setError("email", { type: "server", message: errors });
+			}
+		}
+
+		if (!setPinResult.success) {
 			toast({
 				variant: "destructive",
 				title: "Ошибка",
@@ -77,13 +86,30 @@ export default function LoginForm() {
 	};
 
 	const onFormPinSubmit = async (values: loginFormPinSchemaType) => {
-		console.log(values);
-
 		const data = new FormData();
 		if (userEmail) {
 			data.append("email", userEmail);
 		}
 		data.append("pin", values.pin);
+
+		const user = await login(data);
+		const errors = user.errors;
+
+		if (errors) {
+			if (errors.pin && errors.pin.length > 0) {
+				let errorsStr = "";
+				errors.pin.forEach((error: string) => {
+					errorsStr += errorsStr + ". ";
+				});
+
+				pinForm.setError("pin", { type: "server", message: errorsStr });
+			}
+		}
+
+		if (user.data) {
+			localStorage.removeItem("userEmail");
+			router.push("/");
+		}
 	};
 
 	return (

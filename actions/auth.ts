@@ -1,11 +1,16 @@
 "use server";
 
-import { loginFormEmailSchema, registrationFormSchema } from "@/schemas/auth";
+import {
+	loginFormEmailSchema,
+	registrationFormSchema,
+	loginFormSchema,
+} from "@/schemas/auth";
 import * as bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
+import { Resend } from "resend";
 
 const secretKey = process.env.JWT_SECRET_KEY;
 const key = new TextEncoder().encode(secretKey);
@@ -33,7 +38,7 @@ export async function getSession() {
 
 export async function updateSession(request: NextRequest) {
 	const session = request.cookies.get("session")?.value;
-	console.log("session", session);
+
 	if (!session) return;
 
 	// Refresh the session so it doesn't expire
@@ -87,7 +92,10 @@ export async function setPin(formData: FormData) {
 	const validatedFields = loginFormEmailSchema.safeParse(data);
 
 	if (!validatedFields.success) {
-		return { error: validatedFields.error.formErrors.fieldErrors };
+		return {
+			success: false,
+			error: validatedFields.error.formErrors.fieldErrors,
+		};
 	}
 
 	const user = await prisma.users.findUnique({
@@ -98,6 +106,7 @@ export async function setPin(formData: FormData) {
 
 	if (!user) {
 		return {
+			success: false,
 			error: {
 				email: ["Пользователь с таким email не существует"],
 			},
@@ -117,56 +126,123 @@ export async function setPin(formData: FormData) {
 	});
 
 	if (updatedUser) {
-		console.log("updatedUser", updatedUser);
+		const resend = new Resend(process.env.RESEND_API_KEY);
+
+		const { error } = await resend.emails.send({
+			from: "Support <support@ivan-krivilyov.ru>",
+			to: [`${user.email}`],
+			subject: "PIN для входа в приложение",
+			html: `<div>Ваш PIN для входа: <span style={font-waight: bold}>${randPin}</span></div>`,
+		});
+
+		if (!error) {
+			return {
+				success: true,
+				error: {
+					email: [],
+				},
+			};
+		}
 	}
 
-	throw new Error("something went wrong");
+	return {
+		success: false,
+		error: {
+			email: [],
+		},
+	};
 }
 
-// export async function login(formData: FormData) {
-// 	const data = Object.fromEntries(formData);
-// 	const validatedFields = loginFormSchema.safeParse(data);
+export async function login(formData: FormData) {
+	const data = Object.fromEntries(formData);
+	console.log("data", data);
+	const validatedFields = loginFormSchema.safeParse(data);
 
-// 	if (!validatedFields.success) {
-// 		return { error: validatedFields.error.formErrors.fieldErrors };
-// 	}
+	if (!validatedFields.success) {
+		return { data: null, errors: validatedFields.error.formErrors.fieldErrors };
+	}
 
-// 	const user = await prisma.users.findUnique({
-// 		where: {
-// 			email: data.email as string,
-// 		},
-// 	});
+	const user = await prisma.users.findUnique({
+		where: {
+			email: data.email as string,
+		},
+	});
 
-// 	if (!user) {
-// 		return {
-// 			error: {
-// 				email: ["Пользователь с таким email не существует"],
-// 			},
-// 		};
-// 	}
+	if (!user) {
+		return {
+			data: null,
+			errors: {
+				email: ["Пользователь с таким email не существует"],
+			},
+		};
+	}
 
-// 	const passwordEquals = await bcrypt.compare(
-// 		data.password as string,
-// 		user.password as string
-// 	);
+	const pinEquals = await bcrypt.compare(
+		data.pin as string,
+		user.hashPin as string
+	);
 
-// 	if (passwordEquals) {
-// 		const userData = {
-// 			email: user.email,
-// 			role: user.role,
-// 		};
+	if (!pinEquals) {
+		return {
+			data: null,
+			errors: {
+				pin: ["Вы ввели неверный PIN"],
+			},
+		};
+	}
 
-// 		// Create the session
-// 		const expires = new Date(Date.now() + 10 * 1000);
-// 		const session = await encrypt({ user, expires });
+	const userData = {
+		email: user.email,
+		role: user.role,
+	};
 
-// 		// Save the session in a cookie
-// 		cookies().set("session", session, { expires, httpOnly: true });
-// 	}
+	// Create the session
+	const expires = new Date(Date.now() + 10 * 1000);
+	const session = await encrypt({ userData, expires });
 
-// 	return {
-// 		error: {
-// 			password: ["Вы ввели неверные данные"],
-// 		},
-// 	};
-// }
+	// Save the session in a cookie
+	cookies().set("session", session, { expires, httpOnly: true });
+
+	return {
+		data: userData,
+	};
+
+	// const user = await prisma.users.findUnique({
+	// 	where: {
+	// 		email: data.email as string,
+	// 	},
+	// });
+
+	// if (!user) {
+	// 	return {
+	// 		error: {
+	// 			email: ["Пользователь с таким email не существует"],
+	// 		},
+	// 	};
+	// }
+
+	// const passwordEquals = await bcrypt.compare(
+	// 	data.password as string,
+	// 	user.password as string
+	// );
+
+	// if (passwordEquals) {
+	// 	const userData = {
+	// 		email: user.email,
+	// 		role: user.role,
+	// 	};
+
+	// 	// Create the session
+	// 	const expires = new Date(Date.now() + 10 * 1000);
+	// 	const session = await encrypt({ user, expires });
+
+	// 	// Save the session in a cookie
+	// 	cookies().set("session", session, { expires, httpOnly: true });
+	// }
+
+	// return {
+	// 	error: {
+	// 		password: ["Вы ввели неверные данные"],
+	// 	},
+	// };
+}
