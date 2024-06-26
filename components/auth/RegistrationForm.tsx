@@ -20,15 +20,19 @@ import { registration } from "@/actions/auth";
 import { UserData, UserDataError } from "@/helpers/models";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { GoEye, GoEyeClosed } from "react-icons/go";
 
 export default function RegistrationForm() {
 	const router = useRouter();
 	const [isLoading, setIsLoading] = useState(false);
+	const [showPassword, setShowPassword] = useState(false);
 
 	const form = useForm<registrationFormSchemaType>({
 		resolver: zodResolver(registrationFormSchema),
 		defaultValues: {
 			email: "",
+			password: "",
+			confirmPassword: "",
 		},
 	});
 
@@ -36,18 +40,40 @@ export default function RegistrationForm() {
 		setIsLoading(true);
 		const data = new FormData();
 		data.append("email", values.email);
+		data.append("password", values.password);
+		data.append("confirmPassword", values.confirmPassword);
 
-		const user: UserData | UserDataError = await registration(data);
+		const user = await registration(data);
 		setIsLoading(false);
 		//если вернулись ошибки
-		if (user.error) {
-			if (user.error.email && user.error.email.length > 0) {
-				let errors = "";
-				user.error.email.forEach((error: string) => {
-					errors += error + ". ";
+		const errors = (user as UserDataError).errors;
+
+		if (errors) {
+			if (errors.email && errors.email.length > 0) {
+				let errorStr = "";
+				errors.email.forEach((error: string) => {
+					errorStr += error + ". ";
 				});
 
-				form.setError("email", { type: "server", message: errors });
+				form.setError("email", { type: "server", message: errorStr });
+			}
+
+			if (errors.password && errors.password.length > 0) {
+				let errorStr = "";
+				errors.password.forEach((error: string) => {
+					errorStr += error + ". ";
+				});
+
+				form.setError("password", { type: "server", message: errorStr });
+			}
+
+			if (errors.confirmPassword && errors.confirmPassword.length > 0) {
+				let errorStr = "";
+				errors.confirmPassword.forEach((error: string) => {
+					errorStr += error + ". ";
+				});
+
+				form.setError("confirmPassword", { type: "server", message: errorStr });
 			}
 		}
 
@@ -82,6 +108,67 @@ export default function RegistrationForm() {
 								</FormItem>
 							)}
 						/>
+
+						<FormField
+							control={form.control}
+							name="password"
+							render={({ field }) => (
+								<FormItem>
+									<FormControl>
+										<div className="relative">
+											<Input
+												type={showPassword ? "text" : "password"}
+												placeholder="Пароль"
+												disabled={isLoading}
+												{...field}
+											/>
+											<Button
+												variant={"ghost"}
+												size="sm"
+												className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+												onClick={(e) => {
+													e.preventDefault();
+													setShowPassword((prev) => !prev);
+												}}
+											>
+												{showPassword ? <GoEye /> : <GoEyeClosed />}
+											</Button>
+										</div>
+									</FormControl>
+									<FormMessage />
+								</FormItem>
+							)}
+						/>
+						<FormField
+							control={form.control}
+							name="confirmPassword"
+							render={({ field }) => (
+								<FormItem>
+									<FormControl>
+										<div className="relative">
+											<Input
+												type={showPassword ? "text" : "password"}
+												placeholder="Подтвердите пароль"
+												{...field}
+											/>
+											<Button
+												variant={"ghost"}
+												size="sm"
+												className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+												onClick={(e) => {
+													e.preventDefault();
+													setShowPassword((prev) => !prev);
+												}}
+											>
+												{showPassword ? <GoEye /> : <GoEyeClosed />}
+											</Button>
+										</div>
+									</FormControl>
+									<FormMessage />
+								</FormItem>
+							)}
+						/>
+
 						<Button
 							onClick={form.handleSubmit(onFormSubmit)}
 							disabled={form.formState.isSubmitting}

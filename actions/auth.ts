@@ -1,9 +1,10 @@
 "use server";
 
 import {
-	loginFormEmailSchema,
 	registrationFormSchema,
-	loginFormSchema,
+	loginFormOnlyEmailSchema,
+	loginFormWithPinSchema,
+	loginFormWithPasswordSchema,
 } from "@/schemas/auth";
 import * as bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
@@ -43,7 +44,7 @@ export async function updateSession(request: NextRequest) {
 
 	// Refresh the session so it doesn't expire
 	const parsed = await decrypt(session);
-	parsed.expires = new Date(Date.now() + 10 * 1000);
+	parsed.expires = new Date(Date.now() + 24 * 60 * 60 * 1000 * 7);
 	const res = NextResponse.next();
 	res.cookies.set({
 		name: "session",
@@ -54,15 +55,21 @@ export async function updateSession(request: NextRequest) {
 	return res;
 }
 
+export async function logout() {
+	// Destroy the session
+	cookies().set("session", "", { expires: new Date(0) });
+}
+
 export async function registration(formData: FormData) {
 	const data = Object.fromEntries(formData);
+
 	const validatedFields = registrationFormSchema.safeParse(data);
 
 	if (!validatedFields.success) {
-		return { error: validatedFields.error.formErrors.fieldErrors };
+		return { errors: validatedFields.error.formErrors.fieldErrors };
 	}
 
-	const { email } = data;
+	const { email, password } = data;
 
 	const existingUser = await prisma.users.findUnique({
 		where: {
@@ -72,15 +79,18 @@ export async function registration(formData: FormData) {
 
 	if (existingUser) {
 		return {
-			error: {
+			errors: {
 				email: ["Пользователь с таким email уже зарегистрирован"],
 			},
 		};
 	}
 
+	const hashPassword = await bcrypt.hash(password as string, 6);
+
 	const user = await prisma.users.create({
 		data: {
 			email: email as string,
+			password: hashPassword,
 		},
 	});
 
@@ -89,7 +99,7 @@ export async function registration(formData: FormData) {
 
 export async function setPin(formData: FormData) {
 	const data = Object.fromEntries(formData);
-	const validatedFields = loginFormEmailSchema.safeParse(data);
+	const validatedFields = loginFormOnlyEmailSchema.safeParse(data);
 
 	if (!validatedFields.success) {
 		return {
@@ -153,13 +163,12 @@ export async function setPin(formData: FormData) {
 	};
 }
 
-export async function login(formData: FormData) {
+export async function loginWithPin(formData: FormData) {
 	const data = Object.fromEntries(formData);
-	console.log("data", data);
-	const validatedFields = loginFormSchema.safeParse(data);
 
+	const validatedFields = loginFormWithPinSchema.safeParse(data);
 	if (!validatedFields.success) {
-		return { data: null, errors: validatedFields.error.formErrors.fieldErrors };
+		return { errors: validatedFields.error.formErrors.fieldErrors };
 	}
 
 	const user = await prisma.users.findUnique({
@@ -170,7 +179,6 @@ export async function login(formData: FormData) {
 
 	if (!user) {
 		return {
-			data: null,
 			errors: {
 				email: ["Пользователь с таким email не существует"],
 			},
@@ -184,7 +192,6 @@ export async function login(formData: FormData) {
 
 	if (!pinEquals) {
 		return {
-			data: null,
 			errors: {
 				pin: ["Вы ввели неверный PIN"],
 			},
@@ -197,52 +204,63 @@ export async function login(formData: FormData) {
 	};
 
 	// Create the session
-	const expires = new Date(Date.now() + 10 * 1000);
+	const expires = new Date(Date.now() + 24 * 60 * 60 * 1000 * 7); // One week
 	const session = await encrypt({ userData, expires });
-
 	// Save the session in a cookie
 	cookies().set("session", session, { expires, httpOnly: true });
 
 	return {
 		data: userData,
 	};
+}
 
-	// const user = await prisma.users.findUnique({
-	// 	where: {
-	// 		email: data.email as string,
-	// 	},
-	// });
+export async function loginWithPassword(formData: FormData) {
+	const data = Object.fromEntries(formData);
 
-	// if (!user) {
-	// 	return {
-	// 		error: {
-	// 			email: ["Пользователь с таким email не существует"],
-	// 		},
-	// 	};
-	// }
+	const validatedFields = loginFormWithPasswordSchema.safeParse(data);
+	if (!validatedFields.success) {
+		return { errors: validatedFields.error.formErrors.fieldErrors };
+	}
 
-	// const passwordEquals = await bcrypt.compare(
-	// 	data.password as string,
-	// 	user.password as string
-	// );
+	const user = await prisma.users.findUnique({
+		where: {
+			email: data.email as string,
+		},
+	});
+	console.log("user", user);
+	if (!user) {
+		return {
+			errors: {
+				email: ["Пользователь с таким email не существует"],
+			},
+		};
+	}
 
-	// if (passwordEquals) {
-	// 	const userData = {
-	// 		email: user.email,
-	// 		role: user.role,
-	// 	};
+	const passwordEquals = await bcrypt.compare(
+		data.password as string,
+		user.password as string
+	);
 
-	// 	// Create the session
-	// 	const expires = new Date(Date.now() + 10 * 1000);
-	// 	const session = await encrypt({ user, expires });
+	if (!passwordEquals) {
+		return {
+			errors: {
+				password: ["Вы ввели неверный неверный пароль"],
+			},
+		};
+	}
 
-	// 	// Save the session in a cookie
-	// 	cookies().set("session", session, { expires, httpOnly: true });
-	// }
+	const userData = {
+		email: user.email,
+		role: user.role,
+	};
 
-	// return {
-	// 	error: {
-	// 		password: ["Вы ввели неверные данные"],
-	// 	},
-	// };
+	// Create the session
+	const expires = new Date(Date.now() + 24 * 60 * 60 * 1000 * 7); // One week
+	const session = await encrypt({ userData, expires });
+	// Save the session in a cookie
+	cookies().set("session", session, { expires, httpOnly: true });
+
+	return {
+		data: userData,
+	};
 }

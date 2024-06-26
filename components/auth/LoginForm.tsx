@@ -15,12 +15,14 @@ import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { ImSpinner2 } from "react-icons/im";
 import {
-	loginFormEmailSchema,
-	loginFormEmailSchemaType,
-	loginFormPinSchema,
-	loginFormPinSchemaType,
+	loginFormOnlyEmailSchema,
+	loginFormOnlyEmailSchemaType,
+	loginFormWithPinSchema,
+	loginFormWithPinSchemaType,
+	loginFormWithPasswordSchemaType,
+	loginFormWithPasswordSchema,
 } from "@/schemas/auth";
-import { login, setPin } from "@/actions/auth";
+import { loginWithPassword, loginWithPin, setPin } from "@/actions/auth";
 import { useToast } from "@/components/ui/use-toast";
 import { useRouter } from "next/navigation";
 
@@ -29,19 +31,30 @@ export default function LoginForm() {
 	const router = useRouter();
 	const [isLoading, setIsLoading] = useState(false);
 	const [userEmail, setUserEmail] = useState<string | null>(null);
-	const [isShowPinForm, setIsShowPinForm] = useState(false);
+	const [typeLoginForm, setTypeLoginForm] = useState<
+		"withPin" | "withPassword" | null
+	>(null);
 
-	const emailForm = useForm<loginFormEmailSchemaType>({
-		resolver: zodResolver(loginFormEmailSchema),
+	const formOnlyEmail = useForm<loginFormOnlyEmailSchemaType>({
+		resolver: zodResolver(loginFormOnlyEmailSchema),
 		defaultValues: {
 			email: "",
 		},
 	});
 
-	const pinForm = useForm<loginFormPinSchemaType>({
-		resolver: zodResolver(loginFormPinSchema),
+	const formForPinAuth = useForm<loginFormWithPinSchemaType>({
+		resolver: zodResolver(loginFormWithPinSchema),
 		defaultValues: {
+			email: "",
 			pin: "",
+		},
+	});
+
+	const formForPasswordAuth = useForm<loginFormWithPasswordSchemaType>({
+		resolver: zodResolver(loginFormWithPasswordSchema),
+		defaultValues: {
+			email: "",
+			password: "",
 		},
 	});
 
@@ -49,16 +62,22 @@ export default function LoginForm() {
 		const email = localStorage.getItem("userEmail");
 		if (email) {
 			setUserEmail(email);
-			emailForm.setValue("email", email);
-			setIsShowPinForm(true);
+			setTypeLoginForm("withPin");
+			formForPinAuth.setValue("email", email);
 		}
 	}, []);
 
-	const onFormEmailSubmit = async (values: loginFormEmailSchemaType) => {
+	const onFormOnlyEmailSubmit = async (
+		values: loginFormOnlyEmailSchemaType
+	) => {
+		console.log(values);
+		setIsLoading(true);
 		const data = new FormData();
 		data.append("email", values.email);
 
 		const setPinResult = await setPin(data);
+
+		setIsLoading(false);
 
 		if (setPinResult.error) {
 			if (setPinResult.error.email && setPinResult.error.email.length > 0) {
@@ -67,11 +86,11 @@ export default function LoginForm() {
 					errors += error + ". ";
 				});
 
-				emailForm.setError("email", { type: "server", message: errors });
+				formOnlyEmail.setError("email", { type: "server", message: errors });
 			}
 		}
 
-		if (!setPinResult.success) {
+		if (!setPinResult.success && !setPinResult.error) {
 			toast({
 				variant: "destructive",
 				title: "Ошибка",
@@ -81,28 +100,106 @@ export default function LoginForm() {
 
 		if (setPinResult.success) {
 			localStorage.setItem("userEmail", values.email);
-			setIsShowPinForm(true);
+			setUserEmail(values.email);
+			setTypeLoginForm("withPin");
+			formForPinAuth.setValue("email", values.email);
 		}
 	};
 
-	const onFormPinSubmit = async (values: loginFormPinSchemaType) => {
-		const data = new FormData();
-		if (userEmail) {
-			data.append("email", userEmail);
+	useEffect(() => {
+		const email = userEmail ? userEmail : "";
+
+		if (!typeLoginForm) {
+			formOnlyEmail.setValue("email", email);
 		}
+
+		if (typeLoginForm === "withPin") {
+			formForPinAuth.setValue("email", email);
+		}
+
+		if (typeLoginForm === "withPassword") {
+			formForPasswordAuth.setValue("email", email);
+		}
+	}, [
+		typeLoginForm,
+		formOnlyEmail,
+		formForPinAuth,
+		formForPasswordAuth,
+		userEmail,
+	]);
+
+	const onFormForPinAuthSubmit = async (values: loginFormWithPinSchemaType) => {
+		console.log("pin", values);
+		setIsLoading(true);
+		const data = new FormData();
+		data.append("email", values.email);
 		data.append("pin", values.pin);
 
-		const user = await login(data);
+		const user = await loginWithPin(data);
 		const errors = user.errors;
-
+		setIsLoading(false);
 		if (errors) {
-			if (errors.pin && errors.pin.length > 0) {
-				let errorsStr = "";
-				errors.pin.forEach((error: string) => {
-					errorsStr += errorsStr + ". ";
+			if (errors.email && errors.email.length > 0) {
+				let errorStr = "";
+				errors.email.forEach((error: string) => {
+					errorStr += error + ". ";
 				});
 
-				pinForm.setError("pin", { type: "server", message: errorsStr });
+				formForPinAuth.setError("email", { type: "server", message: errorStr });
+			}
+
+			if (errors.pin && errors.pin.length > 0) {
+				let errorStr = "";
+				errors.pin.forEach((error: string) => {
+					errorStr += error + ". ";
+				});
+
+				formForPinAuth.setError("pin", { type: "server", message: errorStr });
+			}
+		}
+
+		if (user.data) {
+			localStorage.removeItem("userEmail");
+			router.push("/");
+		}
+	};
+
+	const onFormForPasswordSubmit = async (
+		values: loginFormWithPasswordSchemaType
+	) => {
+		console.log("password", values);
+		setIsLoading(true);
+		const data = new FormData();
+		data.append("email", values.email);
+		data.append("password", values.password);
+
+		const user = await loginWithPassword(data);
+		const errors = user.errors;
+
+		setIsLoading(false);
+		if (errors) {
+			if (errors.email && errors.email.length > 0) {
+				let errorStr = "";
+				errors.email.forEach((error: string) => {
+					errorStr += error + ". ";
+				});
+
+				formForPasswordAuth.setError("email", {
+					type: "server",
+					message: errorStr,
+				});
+			}
+
+			if (errors.password && errors.password.length > 0) {
+				let errorStr = "";
+				errors.password.forEach((error: string) => {
+					errorStr += error + ". ";
+				});
+
+				formForPasswordAuth.setError("password", {
+					type: "server",
+					message: errorStr,
+				});
 			}
 		}
 
@@ -116,79 +213,172 @@ export default function LoginForm() {
 		<div className="w-full 2sm:w-[350px] space-y-4">
 			<h1 className="text-2xl font-bold text-center">Войти</h1>
 			<div className="space-y-4">
-				<Form {...emailForm}>
-					<form
-						onSubmit={emailForm.handleSubmit(onFormEmailSubmit)}
-						className="space-y-4"
-					>
-						<FormField
-							control={emailForm.control}
-							name="email"
-							render={({ field }) => (
-								<FormItem>
-									<FormControl>
-										<Input
-											placeholder="Email"
-											{...field}
-											disabled={isLoading || !!userEmail}
-										/>
-									</FormControl>
-									<FormMessage />
-								</FormItem>
-							)}
-						/>
-					</form>
-				</Form>
-				{isShowPinForm && (
-					<Form {...pinForm}>
-						<form
-							onSubmit={pinForm.handleSubmit(onFormPinSubmit)}
-							className="space-y-4"
+				{!typeLoginForm && (
+					<>
+						<Form {...formOnlyEmail}>
+							<form
+								onSubmit={formOnlyEmail.handleSubmit(onFormOnlyEmailSubmit)}
+								className="space-y-4"
+							>
+								<FormField
+									control={formOnlyEmail.control}
+									name="email"
+									render={({ field }) => (
+										<FormItem>
+											<FormControl>
+												<Input
+													placeholder="Email"
+													{...field}
+													disabled={isLoading}
+												/>
+											</FormControl>
+											<FormDescription>
+												Использовать{" "}
+												<span
+													className="font-bold text-primary cursor-pointer"
+													onClick={() => setTypeLoginForm("withPassword")}
+												>
+													пароль
+												</span>{" "}
+												для входа
+											</FormDescription>
+											<FormMessage />
+										</FormItem>
+									)}
+								/>
+							</form>
+						</Form>
+
+						<Button
+							onClick={formOnlyEmail.handleSubmit(onFormOnlyEmailSubmit)}
+							disabled={formOnlyEmail.formState.isSubmitting}
+							className="w-full mt-4"
 						>
-							<FormField
-								control={pinForm.control}
-								name="pin"
-								render={({ field }) => (
-									<FormItem>
-										<FormControl>
-											<Input
-												placeholder="PIN"
-												{...field}
-												disabled={isLoading}
-											/>
-										</FormControl>
-										<FormDescription>
-											На указанную почту, было отправлено письмо с PIN для
-											авторизации
-										</FormDescription>
-										<FormMessage />
-									</FormItem>
+							{!isLoading && <span>Войти</span>}
+							{isLoading && <ImSpinner2 className="animate-spin" />}
+						</Button>
+					</>
+				)}
+
+				{typeLoginForm === "withPin" && (
+					<>
+						<Form {...formForPinAuth}>
+							<form
+								onSubmit={formForPinAuth.handleSubmit(onFormForPinAuthSubmit)}
+								className="space-y-4"
+							>
+								<FormField
+									control={formForPinAuth.control}
+									name="email"
+									render={({ field }) => (
+										<FormItem>
+											<FormControl>
+												<Input placeholder="Email" {...field} disabled={true} />
+											</FormControl>
+											<FormMessage />
+										</FormItem>
+									)}
+								/>
+								<FormField
+									control={formForPinAuth.control}
+									name="pin"
+									render={({ field }) => (
+										<FormItem>
+											<FormControl>
+												<Input
+													placeholder="PIN"
+													{...field}
+													disabled={isLoading}
+												/>
+											</FormControl>
+											<FormMessage />
+										</FormItem>
+									)}
+								/>
+							</form>
+						</Form>
+
+						<Button
+							onClick={formForPinAuth.handleSubmit(onFormForPinAuthSubmit)}
+							disabled={formForPinAuth.formState.isSubmitting}
+							className="w-full mt-4"
+						>
+							{!isLoading && <span>Войти</span>}
+							{isLoading && <ImSpinner2 className="animate-spin" />}
+						</Button>
+						<Button
+							variant="outline"
+							className="w-full mt-4"
+							onClick={() => setTypeLoginForm(null)}
+						>
+							Отменить
+						</Button>
+					</>
+				)}
+
+				{typeLoginForm === "withPassword" && (
+					<>
+						<Form {...formForPasswordAuth}>
+							<form
+								onSubmit={formForPasswordAuth.handleSubmit(
+									onFormForPasswordSubmit
 								)}
-							/>
-						</form>
-					</Form>
-				)}
+								className="space-y-4"
+							>
+								<FormField
+									control={formForPasswordAuth.control}
+									name="email"
+									render={({ field }) => (
+										<FormItem>
+											<FormControl>
+												<Input
+													placeholder="Email"
+													{...field}
+													disabled={isLoading}
+												/>
+											</FormControl>
+											<FormMessage />
+										</FormItem>
+									)}
+								/>
+								<FormField
+									control={formForPasswordAuth.control}
+									name="password"
+									render={({ field }) => (
+										<FormItem>
+											<FormControl>
+												<Input
+													type="password"
+													placeholder="Password"
+													{...field}
+													disabled={isLoading}
+												/>
+											</FormControl>
+											<FormMessage />
+										</FormItem>
+									)}
+								/>
+							</form>
+						</Form>
 
-				{!isShowPinForm && (
-					<Button
-						onClick={emailForm.handleSubmit(onFormEmailSubmit)}
-						disabled={emailForm.formState.isSubmitting}
-						className="w-full mt-4"
-					>
-						{!isLoading && <span>Войти</span>}
-						{isLoading && <ImSpinner2 className="animate-spin" />}
-					</Button>
-				)}
-
-				{isShowPinForm && (
-					<Button
-						onClick={pinForm.handleSubmit(onFormPinSubmit)}
-						disabled={pinForm.formState.isSubmitting}
-						className="w-full mt-4"
-					>
-						{!isLoading && <span>Войти</span>}
-						{isLoading && <ImSpinner2 className="animate-spin" />}
-					</Button>
+						<Button
+							onClick={formForPasswordAuth.handleSubmit(
+								onFormForPasswordSubmit
+							)}
+							disabled={formOnlyEmail.formState.isSubmitting}
+							className="w-full mt-4"
+						>
+							{!isLoading && <span>Войти</span>}
+							{isLoading && <ImSpinner2 className="animate-spin" />}
+						</Button>
+						<Button
+							variant="outline"
+							className="w-full mt-4"
+							onClick={() => setTypeLoginForm(null)}
+						>
+							Отменить
+						</Button>
+					</>
 				)}
 			</div>
 		</div>

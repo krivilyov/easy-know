@@ -7,14 +7,13 @@ export interface UserData {
 	updatedAt: Date;
 	companyId: string | null;
 	banned: boolean;
-	error?: {
-		email?: string[] | undefined;
-	};
 }
 
 export interface UserDataError {
-	error?: {
+	errors?: {
 		email?: string[] | undefined;
+		password?: string[] | undefined;
+		confirmPassword?: string[] | undefined;
 		pin?: string[] | undefined;
 	};
 }
