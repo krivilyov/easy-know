@@ -94,7 +94,9 @@ export async function registration(formData: FormData) {
 		},
 	});
 
-	return user;
+	return {
+		data: user,
+	};
 }
 
 export async function setPin(formData: FormData) {

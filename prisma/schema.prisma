@@ -18,6 +18,11 @@ enum Role {
   ADMIN
 }
 
+enum RoleCompanyInside {
+  WRITER
+  ADMIN
+}
+
 
 model Users {
   id  String  @id @default(cuid())
@@ -27,17 +32,25 @@ model Users {
   role  Role  @default(CUSTOMER)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
-  company Companies? @relation(fields: [companyId], references: [id], onDelete: SetNull)
-  companyId String?
   banned Boolean @default(false)
+  companies CompaniesOnUsers[]
 }
 
 model Companies {
   id  String  @id @default(cuid())
-  slug String?
-  name String @unique
+  slug String
+  name String
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
-  users Users[]
   banned Boolean @default(false)
+  users CompaniesOnUsers[]
+}
+
+model CompaniesOnUsers {
+  user Users @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  company Companies @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  companyId String
+  role  RoleCompanyInside  @default(WRITER)
+  @@id([userId, companyId])
 }

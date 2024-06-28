@@ -5,6 +5,7 @@ import Logo from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
+import SignInBtn from "@/components/SignInBtn";
 
 export default function AuthHeader() {
 	const pathname = usePathname();
@@ -20,9 +21,7 @@ export default function AuthHeader() {
 							<Link href="/registration">Регистрация</Link>
 						</Button>
 					) : (
-						<Button asChild>
-							<Link href="/login">Войти</Link>
-						</Button>
+						<SignInBtn />
 					)}
 				</div>
 			</div>

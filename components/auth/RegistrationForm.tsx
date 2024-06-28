@@ -46,7 +46,7 @@ export default function RegistrationForm() {
 		const user = await registration(data);
 		setIsLoading(false);
 		//если вернулись ошибки
-		const errors = (user as UserDataError).errors;
+		const errors = user.errors;
 
 		if (errors) {
 			if (errors.email && errors.email.length > 0) {
@@ -77,8 +77,8 @@ export default function RegistrationForm() {
 			}
 		}
 
-		if ((user as UserData).id) {
-			localStorage.setItem("userEmail", (user as UserData).email);
+		if (user.data) {
+			localStorage.setItem("userEmail", user.data.email);
 			router.push("/login");
 		}
 	};
