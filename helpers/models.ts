@@ -22,3 +22,12 @@ export interface SetPinResponseData {
 	error?: boolean;
 	success: boolean;
 }
+
+export interface SpaceData {
+	id: number;
+	slug: string;
+	name: string;
+	createdAt: Date;
+	updatedAt: Date;
+	banned: boolean;
+}

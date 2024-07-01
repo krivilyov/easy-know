@@ -201,6 +201,7 @@ export async function loginWithPin(formData: FormData) {
 	}
 
 	const userData = {
+		id: user.id,
 		email: user.email,
 		role: user.role,
 	};
@@ -252,6 +253,7 @@ export async function loginWithPassword(formData: FormData) {
 	}
 
 	const userData = {
+		id: user.id,
 		email: user.email,
 		role: user.role,
 	};

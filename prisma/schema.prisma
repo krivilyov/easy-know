@@ -25,7 +25,7 @@ enum RoleCompanyInside {
 
 
 model Users {
-  id  String  @id @default(cuid())
+  id Int @id @default(autoincrement())
   email String   @unique
   password  String?
   hashPin String?
@@ -33,24 +33,25 @@ model Users {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   banned Boolean @default(false)
-  companies CompaniesOnUsers[]
+  spaces SpacesOnUsers[]
 }
 
-model Companies {
-  id  String  @id @default(cuid())
-  slug String
+model Spaces {
+  id Int @id @default(autoincrement())
+  slug String @unique
   name String
+  description String
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   banned Boolean @default(false)
-  users CompaniesOnUsers[]
+  users SpacesOnUsers[]
 }
 
-model CompaniesOnUsers {
+model SpacesOnUsers {
   user Users @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId String
-  company Companies @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  companyId String
+  userId Int
+  space Spaces @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  spaceId Int
   role  RoleCompanyInside  @default(WRITER)
-  @@id([userId, companyId])
+  @@id([userId, spaceId])
 }

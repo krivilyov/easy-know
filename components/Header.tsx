@@ -1,4 +1,3 @@
-import { getSession } from "@/actions/auth";
 import Logo from "@/components/Logo";
 import ThemeSwitcher from "@/components/ThemeSwitcher";
 import UserMenu from "@/components/user-auth-menu/UserAuthMenu";
