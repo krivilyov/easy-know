@@ -20,6 +20,7 @@
 		"bcryptjs": "^2.4.3",
 		"class-variance-authority": "^0.7.0",
 		"clsx": "^2.1.1",
+		"dayjs": "^1.11.11",
 		"jose": "^5.4.1",
 		"next": "14.2.4",
 		"next-themes": "^0.3.0",

@@ -1,29 +1,30 @@
-"use client";
-
 import { getSpaceByUser } from "@/actions/space";
-import { SpaceData } from "@/helpers/models";
-import { useEffect, useState } from "react";
+import { notFound } from "next/navigation";
+import SpaceDetail from "@/components/spaces/SpaceDetail";
 
-export default function Page({ params }: { params: { slug: string } }) {
-	const [space, setSpace] = useState<SpaceData | null>(null);
+interface SpaceData {
+	id: number;
+	slug: string;
+	name: string;
+	description: string;
+	createdAt?: Date;
+	updatedAt?: Date;
+	banned?: boolean;
+	users: { user: { id: number; email: string } }[];
+}
 
-	const getSpace = async () => {
-		const data = new FormData();
-		data.append("slug", params.slug);
-		const space = await getSpaceByUser(data);
+export default async function Page({ params }: { params: { slug: string } }) {
+	const data = new FormData();
+	data.append("slug", params.slug);
+	const space: SpaceData | null = await getSpaceByUser(data);
 
-		if (space) {
-			setSpace(space);
-		}
-	};
-
-	useEffect(() => {
-		getSpace();
-	}, [params]);
+	if (!space) {
+		notFound();
+	}
 
 	return (
 		<div className="container mx-auto w-full h-full flex flex-col flex-grow py-8">
-			{space && <div>Space name {space.name}</div>}
+			<SpaceDetail space={space} />
 		</div>
 	);
 }

@@ -27,7 +27,8 @@ export interface SpaceData {
 	id: number;
 	slug: string;
 	name: string;
-	createdAt: Date;
-	updatedAt: Date;
-	banned: boolean;
+	description: string;
+	createdAt?: Date;
+	updatedAt?: Date;
+	banned?: boolean;
 }

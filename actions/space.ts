@@ -117,6 +117,7 @@ export async function getSpaceByUser(formData: FormData) {
 	const space = await prisma.spaces.findUnique({
 		where: {
 			slug: data.slug as string,
+			banned: false,
 			users: {
 				some: {
 					user: {
@@ -125,11 +126,29 @@ export async function getSpaceByUser(formData: FormData) {
 				},
 			},
 		},
+		select: {
+			id: true,
+			slug: true,
+			name: true,
+			description: true,
+			users: {
+				select: {
+					role: true,
+					user: {
+						select: {
+							id: true,
+							email: true,
+						},
+					},
+				},
+				where: {
+					user: {
+						banned: false,
+					},
+				},
+			},
+		},
 	});
-
-	if (!space) {
-		throw new Error("Access denied.");
-	}
 
 	return space;
 }
